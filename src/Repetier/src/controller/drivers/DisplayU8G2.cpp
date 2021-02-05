@@ -37,7 +37,11 @@
 #if ENABLED(DISPLAY_FULL_BUFFER)
 U8G2_ST7920_128X64_F_SW_SPI lcd(DISPLAY_ROTATION, UI_SPI_SCK, UI_SPI_MOSI, UI_SPI_CS);
 #else
+#if CPU_ARCH != ARCH_AVR
 U8G2_ST7920_128X64_2_SW_SPI lcd(DISPLAY_ROTATION, UI_SPI_SCK, UI_SPI_MOSI, UI_SPI_CS);
+#else // Save an extra 128 bytes of RAM on AVR
+U8G2_ST7920_128X64_1_SW_SPI lcd(DISPLAY_ROTATION, UI_SPI_SCK, UI_SPI_MOSI, UI_SPI_CS);
+#endif
 #endif
 #endif
 
@@ -214,7 +218,7 @@ void GUI::menuStart(GUIAction action) {
 }
 
 void GUI::menuEnd(GUIAction action, bool scrollbar, bool affectedBySpeed) {
-    if (affectedBySpeed && GUI::speedAffectMenus) {
+    if (affectedBySpeed) {
         GUI::menuAffectBySpeed(action);
     }
     if (action == GUIAction::NEXT) {
