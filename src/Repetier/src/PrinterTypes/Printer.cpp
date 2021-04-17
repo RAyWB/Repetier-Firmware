@@ -693,12 +693,12 @@ void Printer::defaultLoopActions() {
     } else {
         curtime -= previousMillisCmd;
         if (maxInactiveTime != 0 && curtime > maxInactiveTime) {
-            Printer::kill(false);
+            Printer::kill(false, true);
         } else {
             Printer::setAllKilled(false); // prevent repeated kills
         }
         if (stepperInactiveTime != 0 && curtime > stepperInactiveTime) {
-            Printer::kill(true);
+            Printer::kill(true, true);
         }
     }
 #if SDCARDDETECT > -1 && SDSUPPORT
@@ -725,8 +725,9 @@ void Printer::reportCaseLightStatus() {
 }
 
 void Printer::handleInterruptEvent() {
-    if (interruptEvent == 0)
+    if (interruptEvent == 0) {
         return;
+    }
     int event = interruptEvent;
     interruptEvent = 0;
     switch (event) {
@@ -819,7 +820,7 @@ void Printer::showConfiguration() {
     Com::config(PSTR("YHomePos:"), 0, 2);
 #endif
     Com::config(PSTR("ZHomePos:"), Motion1::maxPos[Z_AXIS], 3);
-#else
+#else // not delta printer
     Com::config(PSTR("XHomePos:"), (Motion1::homeDir[X_AXIS] > 0 ? Motion1::maxPos[X_AXIS] : Motion1::minPos[X_AXIS]), 2);
     Com::config(PSTR("YHomePos:"), (Motion1::homeDir[Y_AXIS] > 0 ? Motion1::maxPos[Y_AXIS] : Motion1::minPos[Y_AXIS]), 2);
 #if ZHOME_HEIGHT > 0
@@ -1288,11 +1289,14 @@ void Printer::pausePrint() {
 void Printer::continuePrint() {
 #if SDSUPPORT
     if (Printer::isMenuMode(MENU_MODE_SD_PRINTING + MENU_MODE_PAUSED)) {
-        sd.continuePrint(true);
+        sd.continuePrint();
     } else
 #endif
         if (Printer::isMenuMode(MENU_MODE_PAUSED)) {
         GCodeSource::printAllFLN(PSTR("RequestContinue:"));
+#if !defined(DISABLE_PRINTMODE_ON_PAUSE) || DISABLE_PRINTMODE_ON_PAUSE == 1
+        Printer::setPrinting(true);
+#endif
     }
     setMenuMode(MENU_MODE_PAUSED, false);
 }

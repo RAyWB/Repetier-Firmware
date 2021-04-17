@@ -11,9 +11,9 @@ GUIPageType GUI::pageType[GUI_MAX_LEVEL];  ///< page type
 millis_t GUI::lastRefresh = 0;             ///< Last refresh time
 millis_t GUI::lastAction = 0;              ///< Last action time for autoreturn to display
 GUIStatusLevel GUI::statusLevel = GUIStatusLevel::REGULAR;
-bool GUI::contentChanged = false;                                 ///< set to true if forced refresh is wanted
-GUIAction GUI::nextAction = GUIAction::NONE;                      ///< Next action to execute on opdate
-int GUI::nextActionRepeat = 0;                                    ///< Increment for next/previous
+bool GUI::contentChanged = false;            ///< set to true if forced refresh is wanted
+GUIAction GUI::nextAction = GUIAction::NONE; ///< Next action to execute on opdate
+int GUI::nextActionRepeat = 0;               ///< Increment for next/previous
 
 #if ENCODER_MAX_REPEAT_STEPS != 0
 uint8_t GUI::maxActionRepeatStep = ENCODER_MAX_REPEAT_STEPS;      ///< Max amount of extra encoder repeat steps
@@ -35,6 +35,7 @@ probeProgInfo* GUI::curProbingProgress = nullptr;
 #if SDSUPPORT
 char GUI::cwd[SD_MAX_FOLDER_DEPTH * LONG_FILENAME_LENGTH + 2] = { '/', 0 };
 uint8_t GUI::folderLevel = 0;
+sd_file_t GUI::cwdFile;
 #endif
 
 #if DISPLAY_DRIVER == DRIVER_NONE
@@ -765,8 +766,6 @@ void GUI::setStatus(char* text, GUIStatusLevel lvl) {
         }
         if (lvl == GUIStatusLevel::WARNING) {
             push(warningScreen, status, GUIPageType::STATUS);
-            Printer::playDefaultSound(DefaultSounds::WARNING);
-            push(warningScreen, status, GUIPageType::STATUS);
             Com::promptStart(GUI::pop, Com::tWarning, status, false);
             Com::promptButton(Com::tOk);
             Com::promptShow();
@@ -788,11 +787,11 @@ bool GUI::handleFloatValueAction(GUIAction& action, float& value, float min, flo
     float orig = value;
     if (action == GUIAction::NEXT) {
         float calc = (nextActionRepeat * increment);
-        value = (value == min) ? increment * ::floorf((value + calc) / increment) : (value + calc);
+        value = (value == min) ? increment * ::floorf((value + calc * 1.01) / increment) : (value + calc);
         contentChanged = true;
     } else if (action == GUIAction::PREVIOUS) {
         float calc = (nextActionRepeat * increment);
-        value = (value == max) ? increment * ::ceilf((value - calc) / increment) : (value - calc);
+        value = (value == max) ? increment * ::ceilf((value - calc * 1.01) / increment) : (value - calc);
         contentChanged = true;
     }
     if (value < min) {
@@ -813,11 +812,11 @@ bool GUI::handleFloatValueAction(GUIAction& action, float& value, float incremen
     float orig = value;
     if (action == GUIAction::NEXT) {
         float calc = (nextActionRepeat * increment);
-        value = increment * ::floorf((value + calc) / increment);
+        value = increment * ::floorf((value + calc * 1.01) / increment);
         contentChanged = true;
     } else if (action == GUIAction::PREVIOUS) {
         float calc = (nextActionRepeat * increment);
-        value = increment * ::ceilf((value - calc) / increment);
+        value = increment * ::ceilf((value - calc * 1.01) / increment);
         contentChanged = true;
     }
     if (signbit(orig) != signbit(value)) {
@@ -852,7 +851,7 @@ bool GUI::handleLongValueAction(GUIAction& action, int32_t& value, int32_t min, 
     return orig != value;
 }
 void GUI::menuAffectBySpeed(GUIAction& action) {
-#if ENCODER_MAX_REPEAT_STEPS != 0 
+#if ENCODER_MAX_REPEAT_STEPS != 0
     if (GUI::speedAffectMenus && (action == GUIAction::NEXT || action == GUIAction::PREVIOUS)
         && nextActionRepeat > 1) {
         static GUIAction lastDir = action;

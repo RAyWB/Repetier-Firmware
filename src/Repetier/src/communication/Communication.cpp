@@ -136,6 +136,7 @@ FSTRINGVALUE(Com::tUnitSteps, "steps")
 FSTRINGVALUE(Com::tUnitSeconds, "s")
 FSTRINGVALUE(Com::tUnitMilliSeconds, "ms")
 FSTRINGVALUE(Com::tUnitMilliWatt, "mW")
+FSTRINGVALUE(Com::tUnitMilliamps, "mA")
 FSTRINGVALUE(Com::tUnitPWM, "0-255")
 FSTRINGVALUE(Com::tUnitRPM, "1/min")
 FSTRINGVALUE(Com::tMatPLA, "PLA ")
@@ -151,6 +152,7 @@ FSTRINGVALUE(Com::tTestM999, "Testing fatal error")
 FSTRINGVALUE(Com::tColdExtrusionPrevented, "Cold extrusion prevented")
 #if JSON_OUTPUT
 FSTRINGVALUE(Com::tJSONDir, "{\"dir\":\"")
+FSTRINGVALUE(Com::tJSONSDInfo, "{\"SDinfo\":")
 FSTRINGVALUE(Com::tJSONFiles, "\",\"files\":[")
 FSTRINGVALUE(Com::tJSONArrayEnd, "]}")
 FSTRINGVALUE(Com::tJSONErrorStart, "{\"err\":\"")
@@ -256,27 +258,6 @@ FSTRINGVALUE(Com::tExtruderSpace, "extruder ")
 FSTRINGVALUE(Com::tTempSensorDefect, ": temp sensor defect")
 FSTRINGVALUE(Com::tTempSensorWorking, ": working")
 FSTRINGVALUE(Com::tDryModeUntilRestart, "Printer set into dry run mode until restart!")
-#ifdef DEBUG_QUEUE_MOVE
-FSTRINGVALUE(Com::tDBGId, "ID:")
-FSTRINGVALUE(Com::tDBGVStartEnd, "vStart/End:")
-FSTRINGVALUE(Com::tDBAccelSteps, "accel/decel steps:")
-FSTRINGVALUE(Com::tDBGStartEndSpeed, "st./end speed:")
-FSTRINGVALUE(Com::tDBGFlags, "Flags:")
-FSTRINGVALUE(Com::tDBGJoinFlags, "joinFlags:")
-FSTRINGVALUE(Com::tDBGDelta, "Delta")
-FSTRINGVALUE(Com::tDBGDir, "Dir:")
-FSTRINGVALUE(Com::tDBGFullSpeed, "fullSpeed:")
-FSTRINGVALUE(Com::tDBGVMax, "vMax:")
-FSTRINGVALUE(Com::tDBGAcceleration, "Acceleration:")
-FSTRINGVALUE(Com::tDBGAccelerationPrim, "Acceleration Prim:")
-FSTRINGVALUE(Com::tDBGRemainingSteps, "Remaining steps:")
-FSTRINGVALUE(Com::tDBGAdvanceFull, "advanceFull:")
-FSTRINGVALUE(Com::tDBGAdvanceRate, "advanceRate:")
-FSTRINGVALUE(Com::tDBGLimitInterval, "LimitInterval:")
-FSTRINGVALUE(Com::tDBGMoveDistance, "Move distance on the XYZ space:")
-FSTRINGVALUE(Com::tDBGCommandedFeedrate, "Commanded feedrate:")
-FSTRINGVALUE(Com::tDBGConstFullSpeedMoveTime, "Constant full speed move time:")
-#endif // DEBUG_QUEUE_MOVEFSTRINGVALUE(Com::,"")
 #ifdef DEBUG_DELTA_OVERFLOW
 FSTRINGVALUE(Com::tDBGDeltaOverflow, "Delta overflow:")
 #endif // DEBUG_DELTA_OVERFLOW
@@ -476,6 +457,7 @@ FSTRINGVALUE(Com::tMotorResolutionSteps, "Resolution [steps/mm]")
 FSTRINGVALUE(Com::tMotorMicrosteps, "Microsteps")
 FSTRINGVALUE(Com::tMotorRMSCurrentMA, "RMS Current [mA]")
 FSTRINGVALUE(Com::tMotorRMSCurrentMAColon, "RMS Current [mA]:")
+FSTRINGVALUE(Com::tMotorCurrentColon, "Motor Current:")
 FSTRINGVALUE(Com::tMotorHybridTresholdMMS, "Hybrid Treshold [mm/s]")
 FSTRINGVALUE(Com::tMotorStealthOnOff, "Stealth [0/1]")
 FSTRINGVALUE(Com::tMotorStallSensitivity255, "Stall Sensitivity [0..255]")
@@ -643,6 +625,11 @@ void Com::printF(FSTRINGPARAM(text), uint32_t value) {
     printNumber(value);
 }
 
+void Com::printF(FSTRINGPARAM(text), uint64_t value) {
+    printF(text);
+    printNumber(value);
+}
+
 void Com::printFLN(FSTRINGPARAM(text), int value) {
     printF(text);
     print(value);
@@ -656,6 +643,12 @@ void Com::printFLN(FSTRINGPARAM(text), int32_t value) {
 }
 
 void Com::printFLN(FSTRINGPARAM(text), uint32_t value) {
+    printF(text);
+    printNumber(value);
+    println();
+}
+
+void Com::printFLN(FSTRINGPARAM(text), uint64_t value) {
     printF(text);
     printNumber(value);
     println();
@@ -688,7 +681,7 @@ void Com::print(long value) {
         GCodeSource::writeToAll('-');
         value = -value;
     }
-    printNumber(value);
+    printNumber(static_cast<uint32_t>(value));
 }
 void Com::print(bool value, BoolFormat format) {
     switch (format) {
@@ -714,6 +707,17 @@ void Com::print(bool value, BoolFormat format) {
         }
         break;
     }
+}
+void Com::printNumber(uint64_t n) {
+    char buf[21]; // Assumes 8-bit chars plus zero byte.
+    char* str = &buf[sizeof(buf) - 1];
+    *str = '\0';
+    do {
+        uint64_t m = n;
+        n /= 10;
+        *--str = '0' + (m - 10 * n);
+    } while (n);
+    print(str);
 }
 void Com::printNumber(uint32_t n) {
     char buf[11]; // Assumes 8-bit chars plus zero byte.

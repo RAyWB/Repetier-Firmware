@@ -208,9 +208,9 @@ uint8_t GCode::computeBinarySize(char* ptr) // unsigned int bitfield) {
     return s;
 }
 
-GCode::GCode() {
-    reset();
-}
+GCode::GCode()
+    : params(0u)
+    , params2(0u) { }
 
 void GCode::keepAlive(enum FirmwareState state, int id) {
     // Id is only for debugging to see where busy is hanging!
@@ -338,8 +338,9 @@ void GCode::pushCommand() {
   returned command, the gcode_command_finished() function must be called.
 */
 GCode* GCode::peekCurrentCommand() {
-    if (bufferLength == 0)
+    if (bufferLength == 0) {
         return nullptr; // No more data
+    }
     return &commandsBuffered[bufferReadIndex];
 }
 
@@ -437,7 +438,7 @@ It must be called frequently to empty the incoming buffer.
 void GCode::readFromSerial() {
 #if defined(DOOR_PIN) && DOOR_PIN > -1
     if (Printer::isDoorOpen()) {
-        keepAlive(DoorOpen);
+        keepAlive(FirmwareState::DoorOpen);
         return; // do nothing while door is open
     }
 #endif
@@ -1089,7 +1090,7 @@ void GCode::fatalError(FSTRINGPARAM(message), uint8_t flags) {
         Motion1::emergencyStop();
     }
     EVENT_FATAL_ERROR_OCCURED
-    Printer::kill(flags & FATAL_FLAG_HEATER, flags & FATAL_FLAG_MOTORS);
+    Printer::kill(!(flags & FATAL_FLAG_HEATER), flags & FATAL_FLAG_MOTORS);
     Printer::failedMode = true;
     reportFatalError();
 #if defined(PS_ON_PIN) && PS_ON_PIN > -1
@@ -1102,7 +1103,8 @@ void GCode::fatalError(FSTRINGPARAM(message), uint8_t flags) {
 
 void GCode::reportFatalError() {
     Com::writeToAll = true;
-    Com::printF(Com::tFatal);
+    // Com::printF(Com::tFatal);
+    Com::printF(Com::tError);
     Com::printF(fatalErrorMsg);
     Com::printFLN(PSTR(" - Printer stopped and heaters disabled due to this error. Fix error and restart with M999."));
     UI_ERROR_P(fatalErrorMsg)
@@ -1227,12 +1229,12 @@ void GCodeSource::printAllFLN(FSTRINGPARAM(text), int32_t v) {
     Com::writeToAll = old;
 }
 
-GCodeSource::GCodeSource() {
-    lastLineNumber = 0;
-    wasLastCommandReceivedAsBinary = false;
-    outOfOrder = false;
-    waitingForResend = -1;
-}
+GCodeSource::GCodeSource()
+    : lastLineNumber(0u)
+    , wasLastCommandReceivedAsBinary(false)
+    , timeOfLastDataPacket(0u)
+    , waitingForResend(-1)
+    , outOfOrder(false) { }
 
 bool GCodeSource::hasBaudSources() {
     if (!usbHostSource) {

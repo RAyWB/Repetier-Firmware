@@ -171,6 +171,7 @@ public:
     FSTRINGVAR(tUnitSeconds)
     FSTRINGVAR(tUnitMilliSeconds)
     FSTRINGVAR(tUnitMilliWatt)
+    FSTRINGVAR(tUnitMilliamps)
     FSTRINGVAR(tUnitPWM)
     FSTRINGVAR(tUnitRPM)
     FSTRINGVAR(tMatPLA)
@@ -182,6 +183,7 @@ public:
     FSTRINGVAR(tMatPP)
     FSTRINGVAR(tMatFLEX)
     FSTRINGVAR(tJSONDir)
+    FSTRINGVAR(tJSONSDInfo)
     FSTRINGVAR(tJSONFiles)
     FSTRINGVAR(tJSONArrayEnd)
     FSTRINGVAR(tJSONErrorStart)
@@ -302,27 +304,6 @@ public:
     FSTRINGVAR(tTempSensorDefect)
     FSTRINGVAR(tTempSensorWorking)
     FSTRINGVAR(tDryModeUntilRestart)
-#ifdef DEBUG_QUEUE_MOVE
-    FSTRINGVAR(tDBGId)
-    FSTRINGVAR(tDBGVStartEnd)
-    FSTRINGVAR(tDBAccelSteps)
-    FSTRINGVAR(tDBGStartEndSpeed)
-    FSTRINGVAR(tDBGFlags)
-    FSTRINGVAR(tDBGJoinFlags)
-    FSTRINGVAR(tDBGDelta)
-    FSTRINGVAR(tDBGDir)
-    FSTRINGVAR(tDBGFullSpeed)
-    FSTRINGVAR(tDBGVMax)
-    FSTRINGVAR(tDBGAcceleration)
-    FSTRINGVAR(tDBGAccelerationPrim)
-    FSTRINGVAR(tDBGRemainingSteps)
-    FSTRINGVAR(tDBGAdvanceFull)
-    FSTRINGVAR(tDBGAdvanceRate)
-    FSTRINGVAR(tDBGLimitInterval)
-    FSTRINGVAR(tDBGMoveDistance)
-    FSTRINGVAR(tDBGCommandedFeedrate)
-    FSTRINGVAR(tDBGConstFullSpeedMoveTime)
-#endif // DEBUG_QUEUE_MOVEFSTRINGVALUE(Com::,"")
 #ifdef DEBUG_DELTA_OVERFLOW
     FSTRINGVAR(tDBGDeltaOverflow)
 #endif // DEBUG_DELTA_OVERFLOW
@@ -511,6 +492,7 @@ public:
     FSTRINGVAR(tMotorMicrosteps)
     FSTRINGVAR(tMotorRMSCurrentMA)
     FSTRINGVAR(tMotorRMSCurrentMAColon)
+    FSTRINGVAR(tMotorCurrentColon)
     FSTRINGVAR(tMotorHybridTresholdMMS)
     FSTRINGVAR(tMotorStealthOnOff)
     FSTRINGVAR(tMotorStallSensitivity255)
@@ -563,7 +545,12 @@ public:
     static void config(FSTRINGPARAM(text), int32_t value);
     static void config(FSTRINGPARAM(text), uint32_t value);
     static void config(FSTRINGPARAM(text), float value, uint8_t digits = 2);
+
+    template <typename T>
+    static void printNumber(T n) { printNumber(static_cast<uint32_t>(n)); }
+
     static void printNumber(uint32_t n);
+    static void printNumber(uint64_t n);
     static void printWarningF(FSTRINGPARAM(text));
     static void printInfoF(FSTRINGPARAM(text));
     static void printErrorF(FSTRINGPARAM(text));
@@ -579,11 +566,15 @@ public:
     static void printF(FSTRINGPARAM(text), const char* msg);
     static void printF(FSTRINGPARAM(text), int32_t value);
     static void printF(FSTRINGPARAM(text), uint32_t value);
+    static void printF(FSTRINGPARAM(text), size_t value) { printF(text, static_cast<uint32_t>(value)); }
+    static void printF(FSTRINGPARAM(text), uint64_t value);
     static void printF(FSTRINGPARAM(text), float value, uint8_t digits = 2);
     static void printFLN(FSTRINGPARAM(text), bool value, BoolFormat format = BoolFormat::TRUEFALSE);
     static void printFLN(FSTRINGPARAM(text), int value);
     static void printFLN(FSTRINGPARAM(text), int32_t value);
     static void printFLN(FSTRINGPARAM(text), uint32_t value);
+    static void printFLN(FSTRINGPARAM(text), size_t value) { printFLN(text, static_cast<uint32_t>(value)); }
+    static void printFLN(FSTRINGPARAM(text), uint64_t value);
     static void printFLN(FSTRINGPARAM(text), const char* msg);
     static void printFLN(FSTRINGPARAM(text), float value, uint8_t digits = 2);
     static void printArrayFLN(FSTRINGPARAM(text), float* arr, uint8_t n = 4, uint8_t digits = 2);
@@ -591,6 +582,7 @@ public:
     static void print(bool value, BoolFormat format = BoolFormat::TRUEFALSE);
     static void print(long value);
     static inline void print(uint32_t value) { printNumber(value); }
+    static inline void print(uint64_t value) { printNumber(value); }
     static inline void print(int value) { print((int32_t)value); }
     static void print(const char* text);
     static inline void print(char c) { GCodeSource::writeToAll(c); }

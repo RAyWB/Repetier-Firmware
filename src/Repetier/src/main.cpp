@@ -95,7 +95,7 @@ Custom M Codes
 - M22  - Release SD card
 - M23  - Select SD file (M23 filename.g)
 - M24  - Start/resume SD print
-- M25  - Pause SD print
+- M25  - Pause SD print, S0 = do not park head
 - M26  - Set SD position in bytes (M26 S12345) 
 - M27 C0 S<seconds/off> P<milliseconds/off> - Report SD print status. 
         Set S<sec> P<ms> to enable autoreporting while printing, set P or S to 0 to disable. Set C without P or S to report the current open filename.
@@ -103,6 +103,7 @@ Custom M Codes
 - M29  - Stop SD write
 - M30 <filename> - Delete file on sd card
 - M32 <dirname> create subdirectory
+- M39 S<0/2> Returns the current SD card's information (as JSON string if S param is 2 & JSON_OUTPUT enabled)
 - M42 P<pin number> S<value 0..255> - Change output of pin P to S. Does not work on most important pins.
 - M48 Xpos Ypos Ptests - Test z probe accuracy
 - M80  - Turn on power supply

@@ -23,7 +23,7 @@ Timer 1 (PE13, PE14), 2 (PB8, PB9), 3 (PB0, PC6, PC7), 4 (PD12), 9 (PE5, PE6)
 #define MAX_RAM 131072 // stacker3d_super_mini
 
 // Default is 9 but that is used by fan pins, so map servo to timer 13
-#define SERVO_TIMER_NUM 13
+#define SERVO_TIMER_NUM 13 // maybe set to 12 if you have problems
 
 // Steppers
 #define ORIG_X_STEP_PIN PD2
@@ -146,6 +146,13 @@ Timer 1 (PE13, PE14), 2 (PB8, PB9), 3 (PB0, PC6, PC7), 4 (PD12), 9 (PE5, PE6)
 #endif
 #define SDPOWER -1
 #define ORIG_SDCARDDETECT PC9 // CD
+
+// SD card uses second SPI so we need to create and assign it to sd card
+#define SD_SPI_ADDRESS &SPI_2
+#define CREATE_SPI2 SPI_2
+#define SPI2_MISO_PIN PC2
+#define SPI2_MOSI_PIN PC1
+#define SPI2_SCK_PIN PB10
 
 // LCD / Controller
 #ifndef CUSTOM_CONTROLLER_PINS

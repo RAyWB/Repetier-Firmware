@@ -258,10 +258,9 @@ void HAL::setupTimer() {
 #endif
 }
 
-// Called within checkForPeriodicalActions (main loop, more or less) 
+// Called within checkForPeriodicalActions (main loop, more or less)
 // as fast as possible
 void HAL::handlePeriodical() {
-
 }
 struct PWMChannel {
     bool used;
@@ -450,7 +449,7 @@ fast8_t HAL::initHardwareDAC(fast8_t dacPin) {
     uint8_t channel = ((dacPin == DAC0) ? 0u : 1u);
     pinPeripheral(dacPin, PIO_ANALOG);
     while (DAC->SYNCBUSY.bit.ENABLE)
-        ; 
+        ;
     DAC->CTRLA.reg &= ~DAC_CTRLA_ENABLE;
     while (DAC->SYNCBUSY.bit.ENABLE)
         ;
@@ -767,11 +766,13 @@ void HAL::syncEEPROM() {                                     // store to disk if
             return;
         }
 
-        eepromFile.rewind();
-        if ((eepromFile.write(virtualEeprom, EEPROM_BYTES) != EEPROM_BYTES
-             || !eepromFile.sync())) {
+        if (!eepromFile.isOpen()
+            || eepromFile.write(virtualEeprom, EEPROM_BYTES) != EEPROM_BYTES
+            || !eepromFile.sync()) {
             Com::printErrorFLN(PSTR("Could not write eeprom to sd card"));
             sd.printIfCardErrCode();
+        } else {
+            eepromFile.rewind();
         }
     }
 }
@@ -916,7 +917,7 @@ int HAL::i2cRead(void) {
     return -1; // should never happen, but better then blocking
 }
 
-#if NUM_SERVOS > 0
+#if NUM_SERVOS > 0 || NUM_BEEPERS > 0
 unsigned int HAL::servoTimings[4] = { 0, 0, 0, 0 };
 unsigned int servoAutoOff[4] = { 0, 0, 0, 0 };
 static uint8_t servoIndex = 0;

@@ -77,6 +77,14 @@ void SDCard::automount() {
 #endif
 }
 
+#ifdef CREATE_SPI2
+SPIClass CREATE_SPI2(SPI2_MOSI_PIN, SPI2_MISO_PIN, SPI2_SCK_PIN);
+#endif
+
+#ifndef SD_SPI_ADDRESS
+#define SD_SPI_ADDRESS &SPI
+#endif
+
 void SDCard::mount(const bool manual) {
 #if SDSS > -1
     if (state > SDState::SD_SAFE_EJECTED) {
@@ -96,7 +104,7 @@ void SDCard::mount(const bool manual) {
 #if defined(ENABLE_SOFTWARE_SPI_CLASS) && ENABLE_SOFTWARE_SPI_CLASS
     SdSpiConfig spiConfig = SdSpiConfig(SDSS, ENABLE_DEDICATED_SPI ? DEDICATED_SPI : SHARED_SPI, SD_SCK_MHZ(constrain(SD_SPI_SPEED_MHZ, 1ul, 50ul)), &softSpi);
 #else
-    SdSpiConfig spiConfig = SdSpiConfig(SDSS, ENABLE_DEDICATED_SPI ? DEDICATED_SPI : SHARED_SPI, SD_SCK_MHZ(constrain(SD_SPI_SPEED_MHZ, 1ul, 50ul)));
+    SdSpiConfig spiConfig = SdSpiConfig(SDSS, ENABLE_DEDICATED_SPI ? DEDICATED_SPI : SHARED_SPI, SD_SCK_MHZ(constrain(SD_SPI_SPEED_MHZ, 1ul, 50ul)), SD_SPI_ADDRESS);
 #endif
     if (!fileSystem.begin(spiConfig)) {
         if (mountRetries < 3u) {
@@ -138,7 +146,7 @@ void SDCard::mount(const bool manual) {
     Com::printFLN(PSTR("SD card ok"));
     Com::printFLN(PSTR("SD card inserted"));
 
-    printCardStats(); // <- collects our volumeLabel too.
+    printCardInfo(); // <- collects our volumeLabel too.
 
     if (!volumeLabel[0u] || strncmp_P(volumeLabel, PSTR("NO NAME"), sizeof(volumeLabel)) == 0u) {
         volumeLabel[0u] = '\0'; // There's no volume label at all.
@@ -155,8 +163,20 @@ void SDCard::mount(const bool manual) {
 #endif
 }
 
-void SDCard::printCardStats() {
+void SDCard::printCardInfo(bool json) {
     if (state < SDState::SD_MOUNTED) {
+        if (!json) {
+            if (state != SDState::SD_HAS_ERROR) {
+                Com::printFLN(Com::tNoMountedCard);
+            } else {
+                Com::printFLN(Com::tSDInitFail);
+            }
+        } else {
+#if JSON_OUTPUT
+            Com::printF(Com::tJSONSDInfo);
+            Com::printFLN(PSTR("{\"slot\":0,\"present\":0}}"));
+#endif
+        }
         return;
     }
     // Print out some basic statistics on successful mount. We also store the volume label.
@@ -165,49 +185,75 @@ void SDCard::printCardStats() {
     uint8_t folderCount = 0u;
     getCardInfo(volumeLabel, sizeof(volumeLabel), &volumeSectors, &usageBytes, &fileCount, &folderCount);
 
-    Com::printF(PSTR("Label: "), volumeLabel);
-    Com::printF(PSTR(" | "));
+    if (!json) {
+        Com::printF(PSTR("Label: "), volumeLabel);
+        Com::printF(PSTR(" | "));
 
-    if (fileSystem.fatType() == FAT_TYPE_EXFAT) {
-        Com::printF(PSTR("exFAT"));
-    } else {
-        Com::printF(PSTR("FAT"), fileSystem.fatType());
-    }
-
-    Com::printF(PSTR(" SD"));
-    uint8_t type = fileSystem.card()->type();
-    if (type == SD_CARD_TYPE_SD1) {
-        Com::printF(PSTR("V1"));
-    } else if (type == SD_CARD_TYPE_SD2) {
-        Com::printF(PSTR("V2"));
-    } else if (type == SD_CARD_TYPE_SDHC) {
-        if (fileSystem.sectorsPerCluster() > 64ul) {
-            Com::printF(PSTR("XC")); // Cards > 32gb are XC.
+        if (fileSystem.fatType() == FAT_TYPE_EXFAT) {
+            Com::printF(PSTR("exFAT"));
         } else {
-            Com::printF(PSTR("HC"));
+            Com::printF(PSTR("FAT"), fileSystem.fatType());
         }
-    }
 
-    // Print out volume size
-    bool gb = false;
-    float size = ((0.000001f * 512.0f) * static_cast<float>(volumeSectors));
-    if (size > 1000.0f) {
-        gb = true;
-        size /= 1000.f;
+        Com::printF(PSTR(" SD"));
+        uint8_t type = fileSystem.card()->type();
+        if (type == SD_CARD_TYPE_SD1) {
+            Com::printF(PSTR("V1"));
+        } else if (type == SD_CARD_TYPE_SD2) {
+            Com::printF(PSTR("V2"));
+        } else if (type == SD_CARD_TYPE_SDHC) {
+            if (fileSystem.sectorsPerCluster() > 64ul) {
+                Com::printF(PSTR("XC")); // Cards > 32gb are XC.
+            } else {
+                Com::printF(PSTR("HC"));
+            }
+        }
+
+        // Print out volume size
+        bool gb = false;
+        float size = ((0.000001f * 512.0f) * static_cast<float>(volumeSectors));
+        if (size > 1000.0f) {
+            gb = true;
+            size /= 1000.f;
+        }
+        Com::printF(PSTR(" | Volume Size: "), size);
+        Com::printF(gb ? PSTR(" GB") : PSTR(" MB"));
+        // Print out current estimated usage
+        gb = false;
+        size = (0.000001f * static_cast<float>(usageBytes));
+        if (size > 1000.0f) {
+            gb = true;
+            size /= 1000.0f;
+        }
+        Com::printF(PSTR(" | Usage: "), size);
+        Com::printF(gb ? PSTR(" GB (") : PSTR(" MB ("), static_cast<int32_t>(fileCount));
+        Com::printF(PSTR(" files, "), folderCount);
+        Com::printFLN(PSTR(" folders found.)"));
+    } else {
+#if JSON_OUTPUT
+        //{"SDinfo":{"slot":0,"present":1,"capacity":4294967296,"free":2147485184,"speed":20971520,"clsize":32768}}
+
+        uint64_t sizeBytes = 512ull * volumeSectors;
+        Com::printF(Com::tJSONSDInfo);
+        Com::printF(PSTR("{\"slot\":0,\"present\":1,\"capacity\":"), sizeBytes);
+        Com::printF(PSTR(",\"free\":"), (sizeBytes - usageBytes));
+#if defined(ENABLE_SOFTWARE_SPI_CLASS) && ENABLE_SOFTWARE_SPI_CLASS
+        Com::printF(PSTR(",\"speed\":"), (SD_SCK_MHZ(4ul) / 8ul));
+#else
+        Com::printF(PSTR(",\"speed\":"), (SD_SCK_MHZ(constrain(SD_SPI_SPEED_MHZ, 1ul, 50ul)) / 8ul));
+#endif
+        Com::printF(PSTR(",\"clsize\":"), static_cast<uint32_t>(fileSystem.sectorsPerCluster() * 512ul)); // bytesPerCluster isn't working properly for some reason.
+        // Extra
+        if (volumeLabel[0]) {
+            Com::printF(PSTR(",\"label\":\""));
+            SDCard::printEscapeChars(volumeLabel);
+            Com::print('"');
+        }
+        Com::printF(PSTR(",\"files\":"), fileCount);
+        Com::printF(PSTR(",\"folders\":"), folderCount);
+        Com::printFLN(PSTR("}}"));
+#endif
     }
-    Com::printF(PSTR(" | Volume Size: "), size);
-    Com::printF(gb ? PSTR(" GB") : PSTR(" MB"));
-    // Print out current estimated usage
-    gb = false;
-    size = (0.000001f * static_cast<float>(usageBytes));
-    if (size > 1000.0f) {
-        gb = true;
-        size /= 1000.0f;
-    }
-    Com::printF(PSTR(" | Usage: "), size);
-    Com::printF(gb ? PSTR(" GB (") : PSTR(" MB ("), static_cast<int32_t>(fileCount));
-    Com::printF(PSTR(" files, "), folderCount);
-    Com::printFLN(PSTR(" folders found.)"));
 }
 
 void SDCard::unmount(const bool manual) {
@@ -230,14 +276,15 @@ void SDCard::unmount(const bool manual) {
 #endif
 
     selectedFile.close();
-    fileSystem.card()->spiStop();
-#if SDFAT_FILE_TYPE == 3 // When using FSVolume (ExFAT & FAT)
-    fileSystem.end();
-#endif
 
     GUI::cwd[0u] = '/';
     GUI::cwd[1u] = '\0';
     GUI::folderLevel = 0u;
+    GUI::cwdFile.close();
+
+#if SDFAT_FILE_TYPE == 3 // When using FSVolume (ExFAT & FAT)
+    fileSystem.end();
+#endif
 
     Printer::setMenuMode(MENU_MODE_SD_MOUNTED + MENU_MODE_PAUSED + MENU_MODE_SD_PRINTING, false);
 
@@ -475,7 +522,7 @@ void SDCard::printFullyPaused() {
         return;
     }
     scheduledPause = false;
-    if (EVENT_SD_PAUSE_START(true)) {
+    if (EVENT_SD_PAUSE_START(false)) {
         Commands::waitUntilEndOfAllBuffers();
         Motion1::pushToMemory();
         Printer::moveToReal(IGNORE_COORDINATE, IGNORE_COORDINATE, IGNORE_COORDINATE,
@@ -488,16 +535,16 @@ void SDCard::printFullyPaused() {
         Motion1::moveToParkPosition();
         GCode::executeFString(PSTR(PAUSE_START_COMMANDS));
     }
-    EVENT_SD_PAUSE_END(internal);
+    EVENT_SD_PAUSE_END(false);
 }
 
-void SDCard::continuePrint(const bool internal) {
+void SDCard::continuePrint() {
     if (state != SDState::SD_PRINTING
-        && Printer::isMenuMode(MENU_MODE_PAUSED)) {
+        || !Printer::isMenuMode(MENU_MODE_PAUSED)) {
         return;
     }
-    if (EVENT_SD_CONTINUE_START(internal)) {
-        if (internal) {
+    if (EVENT_SD_CONTINUE_START(scheduledPause)) {
+        if (scheduledPause) {
             Tool* tool = Tool::getActiveTool();
             if (tool) {
                 tool->beforeContinue();
@@ -516,10 +563,11 @@ void SDCard::continuePrint(const bool internal) {
             Motion1::moveByOfficial(Motion1::tmpPosition, Motion1::maxFeedrate[E_AXIS], false);
         }
     }
-    EVENT_SD_CONTINUE_END(internal);
+    EVENT_SD_CONTINUE_END(scheduledPause);
     GCodeSource::registerSource(&sdSource);
     Printer::setPrinting(true);
     Printer::setMenuMode(MENU_MODE_PAUSED, false);
+    scheduledPause = false;
 }
 
 void SDCard::stopPrint(const bool silent) {
@@ -531,6 +579,7 @@ void SDCard::stopPrint(const bool silent) {
     state = SDState::SD_MOUNTED;
     Printer::setMenuMode(MENU_MODE_SD_PRINTING + MENU_MODE_PAUSED, false);
     Printer::setPrinting(false);
+    selectedFile.close();
     if (!silent) {
         Com::printFLN(PSTR("SD print stopped by user."));
         GUI::clearStatus();
@@ -837,6 +886,7 @@ void SDCard::startWrite(const char* filename) {
         Com::printFLN(Com::tWritingToFile, filename);
         lastWriteTimeMS = HAL::timeInMilliseconds();
         state = SDState::SD_WRITING;
+        Com::printFLN(Com::tOk); // Needed for octoprint
     }
 }
 
@@ -874,15 +924,26 @@ void SDCard::deleteFile(const char* filename) {
         return;
     }
     fileSystem.chdir();
-    if (fileSystem.remove(filename)) {
+    if (fileSystem.rmdir(filename)) {
         Com::printFLN(Com::tFileDeleted);
-    } else {
-        if (fileSystem.rmdir(filename)) {
+        return;
+    }
+
+#if EEPROM_AVAILABLE == EEPROM_SDCARD // allow deleting eeprom.bin, but make sure we close the handler too.
+    if (eepromFile.isOpen() && !strcmp(filename, getFN(eepromFile))) {
+        eepromFile.remove();
+        Com::printFLN(Com::tFileDeleted);
+        return;
+    }
+#endif
+
+    if (!(selectedFile.isOpen() && !strcmp(filename, getFN(selectedFile)))) {
+        if (fileSystem.remove(filename)) {
             Com::printFLN(Com::tFileDeleted);
-        } else {
-            Com::printFLN(Com::tDeletionFailed);
+            return;
         }
     }
+    Com::printFLN(Com::tDeletionFailed);
 }
 
 void SDCard::makeDirectory(const char* filename) {

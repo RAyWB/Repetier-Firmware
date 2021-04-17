@@ -691,11 +691,13 @@ void HAL::syncEEPROM() {                                     // store to disk if
             return;
         }
 
-        eepromFile.rewind();
-        if ((eepromFile.write(virtualEeprom, EEPROM_BYTES) != EEPROM_BYTES
-             || !eepromFile.sync())) {
+        if (!eepromFile.isOpen()
+            || eepromFile.write(virtualEeprom, EEPROM_BYTES) != EEPROM_BYTES
+            || !eepromFile.sync()) {
             Com::printErrorFLN(PSTR("Could not write eeprom to sd card"));
             sd.printIfCardErrCode();
+        } else {
+            eepromFile.rewind();
         }
     }
 }
@@ -853,7 +855,7 @@ int HAL::i2cRead(void) {
     return -1; // should never happen, but better then blocking
 }
 
-#if NUM_SERVOS > 0
+#if NUM_SERVOS > 0 || NUM_BEEPERS > 0
 unsigned int HAL::servoTimings[4] = { 0, 0, 0, 0 };
 static unsigned int servoAutoOff[4] = { 0, 0, 0, 0 };
 static uint8_t servoId = 0;
@@ -871,7 +873,7 @@ void HAL::servoMicroseconds(uint8_t servoId, int microsec, uint16_t autoOff) {
 
 ServoInterface* analogServoSlots[4] = { nullptr, nullptr, nullptr, nullptr };
 FORCE_INLINE void servoOffTimer() {
-#if NUM_SERVOS > 0
+#if NUM_SERVOS > 0 || NUM_BEEPERS > 0
     if (actServo) {
         actServo->disable();
         if (servoAutoOff[servoId]) {

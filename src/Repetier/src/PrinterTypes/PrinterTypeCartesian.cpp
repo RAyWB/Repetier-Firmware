@@ -23,8 +23,8 @@
 float PrinterType::bedRectangle[2][2];
 uint16_t PrinterType::eprStart;
 
-void PrinterType::homeAxis(fast8_t axis) {
-    Motion1::simpleHome(axis);
+bool PrinterType::homeAxis(fast8_t axis) {
+    return Motion1::simpleHome(axis);
 }
 
 /** Check if given position pos is an allowed position. Coordinate system here
@@ -161,9 +161,7 @@ void PrinterType::updateDerived() { }
 void PrinterType::enableMotors(fast8_t axes) {
     FOR_ALL_AXES(i) {
         if ((axes & axisBits[i]) != 0 && Motion1::motors[i]) {
-            if (Motion1::motors[i]) {
-                Motion1::motors[i]->enable();
-            }
+            Motion1::motors[i]->enable();
         }
     }
     if ((axes & axisBits[E_AXIS]) != 0 && Motion1::dittoMode) {
