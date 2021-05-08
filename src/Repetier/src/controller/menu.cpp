@@ -308,7 +308,7 @@ void __attribute__((weak)) menuProbeSpeed(GUIAction action, void* data) {
 void __attribute__((weak)) menuProbeTrigHeight(GUIAction action, void* data) {
     GUI::flashToString(GUI::tmpString, PSTR("Trigger Height:"));
     DRAW_FLOAT(GUI::tmpString, Com::tUnitMM, ZProbeHandler::getZProbeHeight(), 2);
-    if (GUI::handleFloatValueAction(action, v, -10.0f, 10.0f, 0.01f)) {
+    if (GUI::handleFloatValueAction(action, v, -20.0f, 20.0f, 0.01f)) {
         ZProbeHandler::setZProbeHeight(v);
     }
 }
@@ -760,7 +760,7 @@ void __attribute__((weak)) menuSDStartPrint(GUIAction action, void* data) {
         } else { // File for print selected instead
             file.close();
             if (sd.selectFile(tempLongFilename)) {
-                GUI::pop();
+                GUI::popAll();
                 GUI::cwd[0u] = '/'; // reset the GUI directory
                 GUI::cwd[1u] = '\0';
                 GUI::folderLevel = 0u;
